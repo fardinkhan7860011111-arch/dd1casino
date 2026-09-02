@@ -13,21 +13,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout Source Code
         uses: actions/checkout@v4
 
-      - name: Setup Java
+      - name: Setup Java Environment
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Setup Flutter
+      - name: Setup Flutter SDK
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
 
-      - name: Create Flutter App
+      - name: Assemble DD1 Application
         run: |
           flutter create --platforms=android --org com.dd1.vip app
           cd app
@@ -41,119 +41,154 @@ jobs:
           void main() {
             WidgetsFlutterBinding.ensureInitialized();
             SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-            runApp(const DD1App());
+            runApp(const DD1EnterpriseApp());
           }
 
           const String ADMIN_UPI = "fardinkhan7860011111@okhdfcbank";
 
-          class DD1App extends StatelessWidget {
-            const DD1App({super.key});
+          class DD1EnterpriseApp extends StatelessWidget {
+            const DD1EnterpriseApp({super.key});
+
             @override
             Widget build(BuildContext context) {
               return MaterialApp(
                 debugShowCheckedModeBanner: false,
                 theme: ThemeData.dark().copyWith(
-                  scaffoldBackgroundColor: const Color(0xFF0D0505),
-                  primaryColor: const Color(0xFFFFD700),
+                  scaffoldBackgroundColor: const Color(0xFF0A0505),
                 ),
-                home: const Lobby(),
+                home: const AuthGatekeeper(),
               );
             }
           }
 
-          class Lobby extends StatefulWidget {
-            const Lobby({super.key});
+          class AuthGatekeeper extends StatefulWidget {
+            const AuthGatekeeper({super.key});
             @override
-            State<Lobby> createState() => _LobbyState();
+            State<AuthGatekeeper> createState() => _AuthGatekeeperState();
           }
 
-          class _LobbyState extends State<Lobby> {
-            static double bal = 0.0;
-            static bool claimed = false;
-            final wins = ["🔥 VIP_9410 won ₹4,800 on Aviator", "💰 VIP_2104 cashed ₹10,000 via UPI", "💎 VIP_6711 opened 7 Diamonds"];
-            int wIdx = 0;
-            Timer? t;
+          class _AuthGatekeeperState extends State<AuthGatekeeper> {
+            bool _isLogged = false;
+            String _name = "";
+            double _balance = 100.0;
+
+            void _login() {
+              HapticFeedback.heavyImpact();
+              setState(() {
+                _name = "VIP Player #7860";
+                _isLogged = true;
+              });
+            }
+
+            @override
+            Widget build(BuildContext context) {
+              if (_isLogged) {
+                return MasterLobby(name: _name, initialBal: _balance, onLogout: () => setState(() => _isLogged = false));
+              }
+
+              return Scaffold(
+                body: Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: const BoxDecoration(
+                    gradient: RadialGradient(
+                      center: Alignment(0, -0.4),
+                      radius: 1.3,
+                      colors: [Color(0xFF2E0A0A), Color(0xFF0A0303)],
+                    ),
+                  ),
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.casino, size: 70, color: Color(0xFFFFD700)),
+                        const SizedBox(height: 16),
+                        const Text('DD1.COM', style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Color(0xFFFFD700), letterSpacing: 2)),
+                        const Text('OFFICIAL VIP CASINO & CRASH ARENA', style: TextStyle(fontSize: 11, color: Colors.white54)),
+                        const SizedBox(height: 36),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black, minimumSize: const Size(double.infinity, 54)),
+                          onPressed: _login,
+                          icon: const Icon(Icons.g_mobiledata, color: Colors.red, size: 30),
+                          label: const Text('Sign in with Google / Gmail', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }
+          }
+
+          class MasterLobby extends StatefulWidget {
+            final String name;
+            final double initialBal;
+            final VoidCallback onLogout;
+            const MasterLobby({super.key, required this.name, required this.initialBal, required this.onLogout});
+            @override
+            State<MasterLobby> createState() => _MasterLobbyState();
+          }
+
+          class _MasterLobbyState extends State<MasterLobby> {
+            late double _balance;
+            final List<String> _live = ["🔥 VIP_9410 won ₹4,800 on Aviator", "💰 VIP_2104 withdrawn ₹10,000 via UPI", "💎 VIP_6711 opened 7 Diamonds"];
+            int _idx = 0;
+            Timer? _timer;
 
             @override
             void initState() {
               super.initState();
-              t = Timer.periodic(const Duration(seconds: 4), (timer) {
-                if (mounted) setState(() => wIdx = (wIdx + 1) % wins.length);
+              _balance = widget.initialBal;
+              _timer = Timer.periodic(const Duration(seconds: 4), (t) {
+                if (mounted) setState(() => _idx = (_idx + 1) % _live.length);
               });
-              if (!claimed) {
-                WidgetsBinding.instance.addPostFrameCallback((_) => _bonus());
-              }
             }
 
             @override
             void dispose() {
-              t?.cancel();
+              _timer?.cancel();
               super.dispose();
-            }
-
-            void _bonus() {
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (c) => AlertDialog(
-                  backgroundColor: const Color(0xFF1F0A0A),
-                  title: const Text('🎁 ₹50 VIP BONUS', style: TextStyle(color: Color(0xFFFFD700))),
-                  content: const Text('Exclusive join bonus to play Aviator and Mines!'),
-                  actions: [
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFFD700)),
-                      onPressed: () {
-                        HapticFeedback.mediumImpact();
-                        setState(() {
-                          claimed = true;
-                          bal += 50;
-                        });
-                        Navigator.pop(c);
-                      },
-                      child: const Text('CLAIM ₹50', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-                    )
-                  ],
-                ),
-              );
             }
 
             void _deposit() {
               final utr = TextEditingController();
+              final qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=$ADMIN_UPI%26pn=DD1VIP%26cu=INR";
               showModalBottomSheet(
                 context: context,
                 isScrollControlled: true,
-                backgroundColor: const Color(0xFF140505),
-                builder: (c) => Padding(
-                  padding: EdgeInsets.only(bottom: MediaQuery.of(c).viewInsets.bottom, left: 16, right: 16, top: 16),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text('DEPOSIT VIA UPI QR', style: TextStyle(color: Color(0xFFFFD700), fontSize: 16, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        color: Colors.white,
-                        child: CustomPaint(size: const Size(140, 140), painter: QRPainter()),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(ADMIN_UPI, style: const TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 10),
-                      TextField(controller: utr, decoration: const InputDecoration(hintText: 'Enter 12-Digit UTR', filled: true)),
-                      const SizedBox(height: 10),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                        onPressed: () {
-                          if (utr.text.length >= 6) {
-                            HapticFeedback.mediumImpact();
-                            setState(() => bal += 500);
-                            Navigator.pop(c);
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Deposit Submitted!')));
-                          }
-                        },
-                        child: const Text('SUBMIT UTR'),
-                      ),
-                      const SizedBox(height: 20),
-                    ],
+                backgroundColor: const Color(0xFF140808),
+                builder: (ctx) => Padding(
+                  padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom, left: 20, right: 20, top: 20),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('OFFICIAL INSTANT DEPOSIT', style: TextStyle(color: Color(0xFFFFD700), fontSize: 16, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 12),
+                        Container(
+                          color: Colors.white,
+                          padding: const EdgeInsets.all(10),
+                          child: Image.network(qrUrl, height: 160, width: 160, fit: BoxFit.contain),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(ADMIN_UPI, style: const TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 12),
+                        TextField(controller: utr, decoration: const InputDecoration(hintText: 'Enter 12-Digit UTR / Ref No.', filled: true)),
+                        const SizedBox(height: 12),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.green, minimumSize: const Size(double.infinity, 48)),
+                          onPressed: () {
+                            if (utr.text.length >= 6) {
+                              HapticFeedback.heavyImpact();
+                              setState(() => _balance += 500);
+                              Navigator.pop(ctx);
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('₹500 Deposit Verified!')));
+                            }
+                          },
+                          child: const Text('CONFIRM PAYMENT'),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
+                    ),
                   ),
                 ),
               );
@@ -163,46 +198,54 @@ jobs:
             Widget build(BuildContext context) {
               return Scaffold(
                 appBar: AppBar(
-                  backgroundColor: const Color(0xFF140505),
-                  title: const Text('DD1 VIP CASINO', style: TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold)),
+                  backgroundColor: const Color(0xFF140606),
+                  title: const Text('DD1.COM VIP', style: TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold)),
+                  actions: [IconButton(icon: const Icon(Icons.logout), onPressed: widget.onLogout)],
                 ),
                 body: ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
                     Container(
                       padding: const EdgeInsets.all(10),
-                      color: const Color(0xFF1C0808),
-                      child: Text(wins[wIdx], style: const TextStyle(color: Colors.amberAccent, fontSize: 12, fontWeight: FontWeight.bold)),
+                      color: const Color(0xFF1E0A0A),
+                      child: Text(_live[_idx], style: const TextStyle(color: Colors.amberAccent, fontSize: 12, fontWeight: FontWeight.bold)),
                     ),
                     const SizedBox(height: 16),
                     Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(color: const Color(0xFF220808), borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(colors: [Color(0xFF2E0F0F), Color(0xFF120404)]),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFFFD700).withOpacity(0.4)),
+                      ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('₹ ${bal.toStringAsFixed(2)}', style: const TextStyle(fontSize: 26, color: Color(0xFFFFD700), fontWeight: FontWeight.bold)),
+                          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text(widget.name, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                            Text('₹ ${_balance.toStringAsFixed(2)}', style: const TextStyle(color: Color(0xFFFFD700), fontSize: 28, fontWeight: FontWeight.bold)),
+                          ]),
                           ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.green), onPressed: _deposit, child: const Text('DEPOSIT')),
                         ],
                       ),
                     ),
                     const SizedBox(height: 20),
                     ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1F0808), padding: const EdgeInsets.all(16)),
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1E0808), padding: const EdgeInsets.all(18)),
                       onPressed: () async {
-                        final r = await Navigator.push(context, MaterialPageRoute(builder: (_) => Aviator(b: bal)));
-                        if (r != null) setState(() => bal = r);
+                        final r = await Navigator.push(context, MaterialPageRoute(builder: (_) => AviatorGame(bal: _balance)));
+                        if (r != null) setState(() => _balance = r);
                       },
-                      child: const Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('AVIATOR 🚀', style: TextStyle(fontWeight: FontWeight.bold)), Icon(Icons.play_arrow, color: Color(0xFFFFD700))]),
+                      child: const Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('AVIATOR 🚀 (UP TO 100X)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)), Icon(Icons.play_arrow, color: Color(0xFFFFD700))]),
                     ),
                     const SizedBox(height: 12),
                     ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1F0808), padding: const EdgeInsets.all(16)),
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1E0808), padding: const EdgeInsets.all(18)),
                       onPressed: () async {
-                        final r = await Navigator.push(context, MaterialPageRoute(builder: (_) => Mines(b: bal)));
-                        if (r != null) setState(() => bal = r);
+                        final r = await Navigator.push(context, MaterialPageRoute(builder: (_) => MinesGame(bal: _balance)));
+                        if (r != null) setState(() => _balance = r);
                       },
-                      child: const Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('MINES PRO 💎', style: TextStyle(fontWeight: FontWeight.bold)), Icon(Icons.play_arrow, color: Color(0xFFFFD700))]),
+                      child: const Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('MINES PRO 💎 (25 TILES)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)), Icon(Icons.play_arrow, color: Color(0xFFFFD700))]),
                     ),
                   ],
                 ),
@@ -210,41 +253,41 @@ jobs:
             }
           }
 
-          class Aviator extends StatefulWidget {
-            final double b;
-            const Aviator({super.key, required this.b});
+          class AviatorGame extends StatefulWidget {
+            final double bal;
+            const AviatorGame({super.key, required this.bal});
             @override
-            State<Aviator> createState() => _AviatorState();
+            State<AviatorGame> createState() => _AviatorGameState();
           }
 
-          class _AviatorState extends State<Aviator> {
-            late double cur;
-            double m = 1.0;
-            bool fly = false;
-            Timer? timer;
+          class _AviatorGameState extends State<AviatorGame> {
+            late double _bal;
+            double _m = 1.0;
+            bool _fly = false;
+            Timer? _t;
 
             @override
             void initState() {
               super.initState();
-              cur = widget.b;
+              _bal = widget.bal;
             }
 
             void _start() {
-              if (cur < 50) return;
+              if (_bal < 50) return;
               HapticFeedback.mediumImpact();
               setState(() {
-                cur -= 50;
-                fly = true;
-                m = 1.0;
+                _bal -= 50;
+                _fly = true;
+                _m = 1.0;
               });
-              double c = 1.2 + Random().nextDouble() * 5;
-              timer?.cancel();
-              timer = Timer.periodic(const Duration(milliseconds: 65), (tm) {
+              double crash = 1.15 + Random().nextDouble() * 5.0;
+              _t?.cancel();
+              _t = Timer.periodic(const Duration(milliseconds: 60), (tm) {
                 setState(() {
-                  m += 0.04;
-                  if (m >= c) {
+                  _m += 0.04;
+                  if (_m >= crash) {
                     tm.cancel();
-                    fly = false;
+                    _fly = false;
                     HapticFeedback.heavyImpact();
                   }
                 });
@@ -252,18 +295,18 @@ jobs:
             }
 
             void _cashout() {
-              if (!fly) return;
-              timer?.cancel();
+              if (!_fly) return;
+              _t?.cancel();
               HapticFeedback.mediumImpact();
               setState(() {
-                fly = false;
-                cur += (50 * m);
+                _fly = false;
+                _bal += (50 * _m);
               });
             }
 
             @override
             void dispose() {
-              timer?.cancel();
+              _t?.cancel();
               super.dispose();
             }
 
@@ -271,23 +314,23 @@ jobs:
             Widget build(BuildContext context) {
               return WillPopScope(
                 onWillPop: () async {
-                  Navigator.pop(context, cur);
+                  Navigator.pop(context, _bal);
                   return false;
                 },
                 child: Scaffold(
-                  appBar: AppBar(title: const Text('AVIATOR 🚀'), backgroundColor: const Color(0xFF140505)),
+                  appBar: AppBar(title: const Text('AVIATOR LIVE 🚀'), backgroundColor: const Color(0xFF140505)),
                   body: Column(
                     children: [
-                      Expanded(child: Center(child: Text('${m.toStringAsFixed(2)}x', style: TextStyle(fontSize: 52, fontWeight: FontWeight.bold, color: fly ? Colors.redAccent : Colors.white38)))),
+                      Expanded(child: Center(child: Text('${_m.toStringAsFixed(2)}x', style: TextStyle(fontSize: 60, fontWeight: FontWeight.bold, color: _fly ? const Color(0xFFFFD700) : Colors.white30)))),
                       Padding(
                         padding: const EdgeInsets.all(20),
                         child: SizedBox(
                           width: double.infinity,
-                          height: 50,
+                          height: 52,
                           child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(backgroundColor: fly ? Colors.amber : Colors.green),
-                            onPressed: fly ? _cashout : _start,
-                            child: Text(fly ? 'CASHOUT ₹${(50 * m).toStringAsFixed(0)}' : 'BET ₹50', style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18)),
+                            style: ElevatedButton.styleFrom(backgroundColor: _fly ? const Color(0xFFFFD700) : Colors.green),
+                            onPressed: _fly ? _cashout : _start,
+                            child: Text(_fly ? 'CASHOUT ₹${(50 * _m).toStringAsFixed(0)}' : 'BET ₹50', style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18)),
                           ),
                         ),
                       )
@@ -298,15 +341,15 @@ jobs:
             }
           }
 
-          class Mines extends StatefulWidget {
-            final double b;
-            const Mines({super.key, required this.b});
+          class MinesGame extends StatefulWidget {
+            final double bal;
+            const MinesGame({super.key, required this.bal});
             @override
-            State<Mines> createState() => _MinesState();
+            State<MinesGame> createState() => _MinesGameState();
           }
 
-          class _MinesState extends State<Mines> {
-            late double cur;
+          class _MinesGameState extends State<MinesGame> {
+            late double _bal;
             List<bool> m = List.filled(25, false);
             List<bool> r = List.filled(25, false);
             bool act = false;
@@ -315,14 +358,14 @@ jobs:
             @override
             void initState() {
               super.initState();
-              cur = widget.b;
+              _bal = widget.bal;
             }
 
             void _start() {
-              if (cur < 50) return;
+              if (_bal < 50) return;
               HapticFeedback.mediumImpact();
               setState(() {
-                cur -= 50;
+                _bal -= 50;
                 act = true;
                 mult = 1.0;
                 r = List.filled(25, false);
@@ -358,7 +401,7 @@ jobs:
               HapticFeedback.mediumImpact();
               setState(() {
                 act = false;
-                cur += (50 * mult);
+                _bal += (50 * mult);
                 r = List.filled(25, true);
               });
             }
@@ -367,7 +410,7 @@ jobs:
             Widget build(BuildContext context) {
               return WillPopScope(
                 onWillPop: () async {
-                  Navigator.pop(context, cur);
+                  Navigator.pop(context, _bal);
                   return false;
                 },
                 child: Scaffold(
@@ -379,7 +422,7 @@ jobs:
                           padding: const EdgeInsets.all(20),
                           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 5, crossAxisSpacing: 8, mainAxisSpacing: 8),
                           itemCount: 25,
-                          itemBuilder: (c, i) => GestureDetector(
+                          itemBuilder: (ctx, i) => GestureDetector(
                             onTap: () => _tap(i),
                             child: Container(
                               decoration: BoxDecoration(color: r[i] ? (m[i] ? Colors.red : Colors.amber) : const Color(0xFF220808), borderRadius: BorderRadius.circular(8)),
@@ -392,42 +435,25 @@ jobs:
                         padding: const EdgeInsets.all(20),
                         child: SizedBox(
                           width: double.infinity,
-                          height: 50,
+                          height: 52,
                           child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(backgroundColor: act ? Colors.amber : Colors.green),
+                            style: ElevatedButton.styleFrom(backgroundColor: act ? const Color(0xFFFFD700) : Colors.green),
                             onPressed: act ? _cashout : _start,
-                            child: Text(act ? 'CASHOUT ₹${(50 * mult).toStringAsFixed(2)}' : 'START ₹50', style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16)),
+                            child: Text(act ? 'CASHOUT ₹${(50 * mult).toStringAsFixed(2)}' : 'START ₹50', style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 17)),
                           ),
                         ),
-                      )
+                      ),
                     ],
                   ),
                 ),
               );
             }
           }
-
-          class QRPainter extends CustomPainter {
-            @override
-            void paint(Canvas canvas, Size size) {
-              final paint = Paint()..color = Colors.black..style = PaintingStyle.fill;
-              double block = size.width / 11;
-              for (int r = 0; r < 11; r++) {
-                for (int c = 0; c < 11; c++) {
-                  if ((r < 4 && c < 4) || (r < 4 && c > 6) || (r > 6 && c < 4) || (r == 5 && c % 2 == 0) || (c == 5 && r % 2 == 0) || ((r * c) % 3 == 0)) {
-                    canvas.drawRect(Rect.fromLTWH(c * block, r * block, block, block), paint);
-                  }
-                }
-              }
-            }
-            @override
-            bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-          }
           EOF
 
           flutter build apk --release --no-tree-shake-icons
 
-      - name: Upload APK
+      - name: Upload Final DD1 APK
         uses: actions/upload-artifact@v4
         with:
           name: dd1casino-apk
