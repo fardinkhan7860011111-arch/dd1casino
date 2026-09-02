@@ -1,4 +1,4 @@
-name: DD1 Production Master Build
+name: DD1 Enterprise 100-Feature Master
 
 on:
   push:
@@ -27,7 +27,7 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Build Full Production Gaming App
+      - name: Build Enterprise Gaming App
         run: |
           flutter create --platforms=android --org com.dd1.vip app
           cd app
@@ -43,13 +43,16 @@ jobs:
           void main() {
             WidgetsFlutterBinding.ensureInitialized();
             SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-            runApp(const DD1App());
+            runApp(const DD1EnterpriseApp());
           }
 
           const String ADMIN_UPI = "fardinkhan7860011111@okhdfcbank";
+          const String ADMIN_NAME = "Fardin Khan";
+          const String ADMIN_BANK = "Bank of Baroda 6232";
 
-          class DD1App extends StatelessWidget {
-            const DD1App({super.key});
+          class DD1EnterpriseApp extends StatelessWidget {
+            const DD1EnterpriseApp({super.key});
+
             @override
             Widget build(BuildContext context) {
               return MaterialApp(
@@ -60,31 +63,66 @@ jobs:
                   scaffoldBackgroundColor: const Color(0xFF130103),
                   primaryColor: const Color(0xFFFFD700),
                 ),
-                home: const AuthScreen(),
+                home: const AuthGate(),
               );
             }
           }
 
-          class AuthScreen extends StatefulWidget {
-            const AuthScreen({super.key});
+          class AuthGate extends StatefulWidget {
+            const AuthGate({super.key});
             @override
-            State<AuthScreen> createState() => _AuthScreenState();
+            State<AuthGate> createState() => _AuthGateState();
           }
 
-          class _AuthScreenState extends State<AuthScreen> {
-            final eCtrl = TextEditingController();
+          class _AuthGateState extends State<AuthGate> {
+            bool _loading = true;
+            String? _userEmail;
+
+            @override
+            void initState() {
+              super.initState();
+              _checkSession();
+            }
+
+            Future<void> _checkSession() async {
+              final prefs = await SharedPreferences.getInstance();
+              setState(() {
+                _userEmail = prefs.getString('active_user_email');
+                _loading = false;
+              });
+            }
+
+            @override
+            Widget build(BuildContext context) {
+              if (_loading) {
+                return const Scaffold(body: Center(child: CircularProgressIndicator(color: Color(0xFFFFD700))));
+              }
+              return _userEmail != null ? DashboardScreen(email: _userEmail!) : const LoginScreen();
+            }
+          }
+
+          class LoginScreen extends StatefulWidget {
+            const LoginScreen({super.key});
+            @override
+            State<LoginScreen> createState() => _LoginScreenState();
+          }
+
+          class _LoginScreenState extends State<LoginScreen> {
+            final emailCtrl = TextEditingController();
 
             Future<void> _login() async {
-              final em = eCtrl.text.trim();
+              final em = emailCtrl.text.trim();
               if (!em.contains('@')) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid Gmail')));
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter a valid Gmail / Email address')));
                 return;
               }
               HapticFeedback.heavyImpact();
               final prefs = await SharedPreferences.getInstance();
-              await prefs.setString('email', em);
-              if (!prefs.containsKey('bal_$em')) await prefs.setDouble('bal_$em', 100.0);
-              Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => LobbyScreen(email: em)));
+              await prefs.setString('active_user_email', em);
+              if (!prefs.containsKey('wallet_$em')) {
+                await prefs.setDouble('wallet_$em', 100.0);
+              }
+              Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => DashboardScreen(email: em)));
             }
 
             @override
@@ -102,14 +140,14 @@ jobs:
                         const Icon(Icons.stars, color: Color(0xFFFFD700), size: 75),
                         const SizedBox(height: 8),
                         const Text('DD1.COM', style: TextStyle(color: Color(0xFFFFD700), fontSize: 36, fontWeight: FontWeight.w900, letterSpacing: 2)),
-                        const Text('REAL MONEY GAMING SUITE', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                        const Text('ENTERPRISE GAMING SUITE', style: TextStyle(color: Colors.white54, fontSize: 11)),
                         const SizedBox(height: 40),
-                        TextField(controller: eCtrl, decoration: const InputDecoration(hintText: 'Enter your Gmail ID', filled: true, fillColor: Color(0xFF170204))),
+                        TextField(controller: emailCtrl, decoration: const InputDecoration(hintText: 'Enter your Gmail ID', filled: true, fillColor: Color(0xFF170204))),
                         const SizedBox(height: 14),
                         ElevatedButton(
                           style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFFD700), minimumSize: const Size(double.infinity, 50)),
                           onPressed: _login,
-                          child: const Text('SIGN IN & START EARNING', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                          child: const Text('SIGN IN & START', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
                         ),
                       ],
                     ),
@@ -119,73 +157,107 @@ jobs:
             }
           }
 
-          class LobbyScreen extends StatefulWidget {
+          class DashboardScreen extends StatefulWidget {
             final String email;
-            const LobbyScreen({super.key, required this.email});
+            const DashboardScreen({super.key, required this.email});
             @override
-            State<LobbyScreen> createState() => _LobbyScreenState();
+            State<DashboardScreen> createState() => _DashboardScreenState();
           }
 
-          class _LobbyScreenState extends State<LobbyScreen> {
-            double bal = 100.0;
+          class _DashboardScreenState extends State<DashboardScreen> {
+            double _bal = 100.0;
+            int _selectedChip = 500;
+            final List<int> _chips = [100, 200, 500, 1000, 2000, 5000];
 
             @override
             void initState() {
               super.initState();
-              _load();
+              _loadWallet();
             }
 
-            Future<void> _load() async {
+            Future<void> _loadWallet() async {
               final prefs = await SharedPreferences.getInstance();
-              setState(() => bal = prefs.getDouble('bal_${widget.email}') ?? 100.0);
+              setState(() => _bal = prefs.getDouble('wallet_${widget.email}') ?? 100.0);
             }
 
-            Future<void> _set(double v) async {
+            Future<void> _updateWallet(double newBal) async {
               final prefs = await SharedPreferences.getInstance();
-              await prefs.setDouble('bal_${widget.email}', v);
-              setState(() => bal = v);
+              await prefs.setDouble('wallet_${widget.email}', newBal);
+              setState(() => _bal = newBal);
             }
 
-            void _deposit() {
-              final utr = TextEditingController();
-              final qr = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=$ADMIN_UPI%26pn=Fardin%20Khan%26cu=INR";
+            void _openDepositModal() {
+              final utrCtrl = TextEditingController();
+              final qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=upi://pay?pa=$ADMIN_UPI%26pn=Fardin%20Khan%26am=$_selectedChip%26cu=INR";
+
               showModalBottomSheet(
                 context: context,
                 backgroundColor: const Color(0xFF280306),
                 isScrollControlled: true,
                 builder: (c) => Padding(
                   padding: EdgeInsets.only(bottom: MediaQuery.of(c).viewInsets.bottom, left: 20, right: 20, top: 20),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text('INSTANT UPI DEPOSIT', style: TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold, fontSize: 16)),
-                      const SizedBox(height: 10),
-                      Container(color: Colors.white, padding: const EdgeInsets.all(8), child: Image.network(qr, height: 160, width: 160)),
-                      const SizedBox(height: 10),
-                      Text(ADMIN_UPI, style: const TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 10),
-                      TextField(controller: utr, decoration: const InputDecoration(hintText: 'Enter 12-Digit UTR', filled: true, fillColor: Color(0xFF130103))),
-                      const SizedBox(height: 10),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.green, minimumSize: const Size(double.infinity, 46)),
-                        onPressed: () {
-                          if (utr.text.length >= 6) {
-                            _set(bal + 500);
-                            Navigator.pop(c);
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('₹500 Deposit Added!')));
-                          }
-                        },
-                        child: const Text('SUBMIT UTR', style: TextStyle(fontWeight: FontWeight.bold)),
-                      ),
-                      const SizedBox(height: 20),
-                    ],
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('BANK OF BARODA INSTANT DEPOSIT', style: TextStyle(color: Color(0xFFFFD700), fontSize: 15, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 4),
+                        Text('$ADMIN_NAME • $ADMIN_BANK', style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: _chips.map((ch) => ChoiceChip(
+                            label: Text('₹$ch'),
+                            selected: _selectedChip == ch,
+                            onSelected: (s) => setState(() => _selectedChip = ch),
+                            selectedColor: const Color(0xFFFFD700),
+                          )).toList(),
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+                          child: Image.network(qrUrl, height: 160, width: 160, fit: BoxFit.contain, errorBuilder: (ctx, _, __) => const Icon(Icons.qr_code, size: 120, color: Colors.black)),
+                        ),
+                        const SizedBox(height: 10),
+                        InkWell(
+                          onTap: () {
+                            Clipboard.setData(const ClipboardData(text: ADMIN_UPI));
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('UPI ID Copied!')));
+                          },
+                          child: Text(ADMIN_UPI, style: const TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold)),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(controller: utrCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(hintText: 'Enter 12-Digit UTR / Ref Number', filled: true, fillColor: Color(0xFF130103))),
+                        const SizedBox(height: 12),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.green, minimumSize: const Size(double.infinity, 46)),
+                          onPressed: () {
+                            if (utrCtrl.text.length >= 6) {
+                              _updateWallet(_bal + _selectedChip);
+                              Navigator.pop(c);
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('₹$_selectedChip Deposited Successfully!')));
+                            }
+                          },
+                          child: const Text('SUBMIT UTR', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
+                    ),
                   ),
                 ),
               );
             }
 
-            void _withdraw() {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => WithdrawScreen(bal: bal, email: widget.email, onOut: (a) => _set(bal - a))));
+            void _openWithdraw() {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => WithdrawScreen(bal: _bal, email: widget.email, onOut: (a) => _updateWallet(_bal - a))));
+            }
+
+            Future<void> _logout() async {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.remove('active_user_email');
+              Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
             }
 
             @override
@@ -193,7 +265,8 @@ jobs:
               return Scaffold(
                 appBar: AppBar(
                   backgroundColor: const Color(0xFF280306),
-                  title: Text('DD1: ${widget.email}', style: const TextStyle(color: Color(0xFFFFD700), fontSize: 13)),
+                  title: Text('DD1: ${widget.email}', style: const TextStyle(color: Color(0xFFFFD700), fontSize: 12)),
+                  actions: [IconButton(icon: const Icon(Icons.logout, color: Colors.red), onPressed: _logout)],
                 ),
                 body: ListView(
                   padding: const EdgeInsets.all(16),
@@ -205,13 +278,13 @@ jobs:
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            const Text('Your Wallet Balance', style: TextStyle(fontSize: 11, color: Colors.white54)),
-                            Text('₹ ${bal.toStringAsFixed(2)}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFFFFD700))),
+                            const Text('Wallet Balance', style: TextStyle(fontSize: 11, color: Colors.white54)),
+                            Text('₹ ${_bal.toStringAsFixed(2)}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFFFFD700))),
                           ]),
                           Row(children: [
-                            ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.green), onPressed: _deposit, child: const Text('Deposit')),
+                            ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.green), onPressed: _openDepositModal, child: const Text('Deposit')),
                             const SizedBox(width: 6),
-                            ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.red), onPressed: _withdraw, child: const Text('Withdraw')),
+                            ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.red), onPressed: _openWithdraw, child: const Text('Withdraw')),
                           ])
                         ],
                       ),
@@ -225,20 +298,20 @@ jobs:
                       mainAxisSpacing: 10,
                       children: [
                         _gameCard('AVIATOR 🚀', Colors.red, () async {
-                          final r = await Navigator.push(context, MaterialPageRoute(builder: (_) => AviatorGame(bal: bal)));
-                          if (r != null) _set(r);
+                          final r = await Navigator.push(context, MaterialPageRoute(builder: (_) => AviatorGame(bal: _bal)));
+                          if (r != null) _updateWallet(r);
                         }),
                         _gameCard('MINES PRO 💎', Colors.blue, () async {
-                          final r = await Navigator.push(context, MaterialPageRoute(builder: (_) => MinesGame(bal: bal)));
-                          if (r != null) _set(r);
+                          final r = await Navigator.push(context, MaterialPageRoute(builder: (_) => MinesGame(bal: _bal)));
+                          if (r != null) _updateWallet(r);
                         }),
                         _gameCard('7 UP 7 DOWN 🎲', Colors.amber, () async {
-                          final r = await Navigator.push(context, MaterialPageRoute(builder: (_) => SevenUpDownGame(bal: bal)));
-                          if (r != null) _set(r);
+                          final r = await Navigator.push(context, MaterialPageRoute(builder: (_) => SevenUpDownGame(bal: _bal)));
+                          if (r != null) _updateWallet(r);
                         }),
                         _gameCard('FORTUNE GEMS 🎰', Colors.green, () async {
-                          final r = await Navigator.push(context, MaterialPageRoute(builder: (_) => FortuneGemsGame(bal: bal)));
-                          if (r != null) _set(r);
+                          final r = await Navigator.push(context, MaterialPageRoute(builder: (_) => FortuneGemsGame(bal: _bal)));
+                          if (r != null) _updateWallet(r);
                         }),
                       ],
                     ),
@@ -270,6 +343,58 @@ jobs:
           class _WithdrawScreenState extends State<WithdrawScreen> {
             final chips = [110, 300, 500, 1000, 2000, 5000];
             double sel = 110;
+            String bankInfo = "Bind Bank Account";
+            bool bound = false;
+
+            @override
+            void initState() {
+              super.initState();
+              _loadBank();
+            }
+
+            Future<void> _loadBank() async {
+              final prefs = await SharedPreferences.getInstance();
+              setState(() {
+                bankInfo = prefs.getString('bank_${widget.email}') ?? "Bind Bank Account";
+                bound = prefs.getBool('bound_${widget.email}') ?? false;
+              });
+            }
+
+            void _editBank() {
+              final ctrl = TextEditingController();
+              showModalBottomSheet(
+                context: context,
+                backgroundColor: const Color(0xFF280306),
+                builder: (ctx) => Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('BIND YOUR BANK ACCOUNT', style: TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 10),
+                      TextField(controller: ctrl, decoration: const InputDecoration(hintText: 'Account No or UPI ID', filled: true, fillColor: Color(0xFF130103))),
+                      const SizedBox(height: 10),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFFD700)),
+                        onPressed: () async {
+                          if (ctrl.text.isNotEmpty) {
+                            final prefs = await SharedPreferences.getInstance();
+                            await prefs.setString('bank_${widget.email}', ctrl.text.trim());
+                            await prefs.setBool('bound_${widget.email}', true);
+                            setState(() {
+                              bankInfo = ctrl.text.trim();
+                              bound = true;
+                            });
+                            Navigator.pop(ctx);
+                          }
+                        },
+                        child: const Text('SAVE', style: TextStyle(color: Colors.black)),
+                      )
+                    ],
+                  ),
+                ),
+              );
+            }
 
             @override
             Widget build(BuildContext context) {
@@ -278,7 +403,20 @@ jobs:
                 body: ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
-                    Text('Withdrawable Balance: ₹${widget.bal.toStringAsFixed(2)}', style: const TextStyle(fontSize: 16, color: Color(0xFFFFD700), fontWeight: FontWeight.bold)),
+                    InkWell(
+                      onTap: _editBank,
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(color: const Color(0xFF337AB7), borderRadius: BorderRadius.circular(6)),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Payout: $bankInfo', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            Icon(bound ? Icons.check_circle : Icons.edit, color: bound ? Colors.green : Colors.amber),
+                          ],
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 16),
                     Wrap(
                       spacing: 8,
@@ -289,7 +427,7 @@ jobs:
                           width: 100,
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(color: sel == c ? const Color(0xFF800C17) : const Color(0xFF280306), border: Border.all(color: sel == c ? const Color(0xFFFFD700) : Colors.white12)),
-                          child: Center(child: Text('₹$c', style: const TextStyle(fontWeight: FontWeight.bold)))),
+                          child: Center(child: Text('₹$c', style: const TextStyle(fontWeight: FontWeight.bold))),
                         ),
                       )).toList(),
                     ),
@@ -297,6 +435,7 @@ jobs:
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFFD700), minimumSize: const Size(double.infinity, 48)),
                       onPressed: () {
+                        if (!bound) { _editBank(); return; }
                         if (sel <= widget.bal) {
                           widget.onOut(sel);
                           Navigator.pop(context);
